@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   Editor,
   EditorState,
+  getDefaultKeyBinding,
   RichUtils,
   Modifier,
   ContentState,
@@ -86,30 +87,30 @@ const MyEditor = () => {
           )
         );
         setEditorState(RichUtils.toggleBlockType(newEditorState, "header-one"));
+
         return "handled";
       } else if (charBeforeCursor === "*") {
-        const newEditorState = EditorState.push(
-          editorState,
-          Modifier.replaceText(
-            contentState,
-            selectionState.merge({
-              anchorOffset: startOffset - 1,
-              focusOffset: startOffset,
-            }),
-            ""
-          )
-        );
-        setEditorState(RichUtils.toggleInlineStyle(newEditorState, "BOLD"));
+        // const newEditorState = EditorState.push(
+        //   editorState,
+        //   Modifier.replaceText(
+        //     contentState,
+        //     selectionState.merge({
+        //       anchorOffset: startOffset - 1,
+        //       focusOffset: startOffset,
+        //     }),
+        //     ""
+        //   )
+        // );
+        setEditorState(RichUtils.toggleInlineStyle(editorState, "BOLD"));
         return "handled";
       }
     } else if (
       charBeforeCursor === "*" &&
       blockText.charAt(startOffset - 2) === "*"
     ) {
-      console.log("inside third condition");
-      const newEditorState = EditorState.push(
+      const newEditorState = RichUtils.toggleInlineStyle(
         editorState,
-        Modifier.applyInlineStyle(contentState, selectionState, "redLine")
+        "redLine"
       );
       setEditorState(newEditorState);
       return "handled";
@@ -135,18 +136,35 @@ const MyEditor = () => {
 
     return "not-handled";
   };
+  // const keyBindingFn = (e) => {
+  //   if (e.key === "Enter") {
+  //     const contentState = editorState.getCurrentContent();
+  //     const selectionState = editorState.getSelection();
+  //     const startKey = selectionState.getStartKey();
+  //     const block = contentState.getBlockForKey(startKey);
+  //     const blockText = block.getText();
+  //     const currentBlockType = RichUtils.getCurrentBlockType(editorState);
+  //     const currentStyle = editorState.getCurrentInlineStyle();
+  //     if (currentBlockType === "header-one") {
+  //       console.log(currentBlockType, "currentBlockType");
+  //       setEditorState(RichUtils.toggleBlockType(editorState, "unstyled"));
+  //       return getDefaultKeyBinding(e), "handled";
+  //     }
+  //     // if (blockText.trim().startsWith("#")) {
+  //     //   setEditorState(RichUtils.toggleBlockType(editorState, "header-one"));
+  //     // }
+  //   }
+
+  //   // return getDefaultKeyBinding(e);
+  // };
 
   const handleReturn = (event) => {
     const currentBlockType = RichUtils.getCurrentBlockType(editorState);
     const currentStyle = editorState.getCurrentInlineStyle();
-    console.log(currentBlockType, "currentBlockType");
-    console.log(currentStyle.size, "currentStyle");
     const isBold = currentStyle.has("BOLD");
+
     if (currentBlockType === "header-one") {
-      const newEditorState = RichUtils.toggleInlineStyle(
-        editorState,
-        "header-one"
-      );
+      const newEditorState = RichUtils.toggleBlockType(editorState, "unstyled");
       const contentStateWithNewLine = Modifier.insertText(
         newEditorState.getCurrentContent(),
         newEditorState.getSelection(),
@@ -158,6 +176,20 @@ const MyEditor = () => {
         "insert-characters"
       );
       setEditorState(newEditorStateWithNewLine);
+
+      // const contentStateWithNewLine = Modifier.insertText(
+      //   editorState.getCurrentContent(),
+      //   editorState.getSelection(),
+      //   "\n"
+      // );
+      // const newEditorStateWithNewLine = EditorState.push(
+      //   editorState,
+      //   contentStateWithNewLine,
+      //   "insert-characters"
+      // );
+
+      setEditorState(newEditorStateWithNewLine);
+      // setEditorState(newEditorState);
       return "handled"; // Return 'handled' to prevent default behavior
     } else {
       if (isBold) {
@@ -208,7 +240,7 @@ const MyEditor = () => {
           onChange={setEditorState}
           //   handleKeyCommand={handleKeyCommand}
           handleBeforeInput={handleBeforeInput}
-          //   keyBindingFn={keyBindingFn}
+          // keyBindingFn={keyBindingFn}
           customStyleMap={customStyleMap}
           handleReturn={handleReturn}
         />
