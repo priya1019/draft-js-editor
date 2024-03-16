@@ -2,11 +2,9 @@ import React, { useState, useEffect } from "react";
 import {
   Editor,
   EditorState,
-  getDefaultKeyBinding,
   RichUtils,
   Modifier,
   ContentState,
-  CompositeDecorator,
 } from "draft-js";
 import "draft-js/dist/Draft.css";
 import { stateToHTML } from "draft-js-export-html";
@@ -14,7 +12,7 @@ import { stateFromHTML } from "draft-js-import-html";
 
 const customStyleMap = {
   redLine: {
-    borderBottom: "2px solid red",
+    color: "red",
   },
   underline: {
     textDecoration: "underline",
@@ -26,32 +24,15 @@ const customStyleMap = {
   },
 };
 
-const InlineStyles = new CompositeDecorator([
-  {
-    strategy: (contentBlock, callback) => {
-      contentBlock.findEntityRanges((character) => {
-        const entityKey = character.getEntity();
-        return (
-          entityKey !== null &&
-          EditorState.getCurrentContent().getEntity(entityKey).getType() ===
-            "BOLD"
-        );
-      }, callback);
-    },
-    component: (props) => <strong>{props.children}</strong>,
-  },
-]);
-
 const MyEditor = () => {
   const [editorState, setEditorState] = useState(() => {
     const savedContent = localStorage.getItem("draftEditorContent");
     if (savedContent) {
       return EditorState.createWithContent(
-        ContentState.createFromText(savedContent),
-        InlineStyles
+        ContentState.createFromText(savedContent)
       );
     }
-    return EditorState.createEmpty(InlineStyles);
+    return EditorState.createEmpty();
   });
   useEffect(() => {
     const savedContent = localStorage.getItem("draftEditorContent");
@@ -60,7 +41,7 @@ const MyEditor = () => {
       const newEditorState = EditorState.createWithContent(contentState);
       setEditorState(newEditorState);
     } else {
-      setEditorState(EditorState.createEmpty(InlineStyles));
+      setEditorState(EditorState.createEmpty());
     }
   }, []);
 
@@ -71,10 +52,47 @@ const MyEditor = () => {
     const startOffset = selectionState.getStartOffset();
     const block = contentState.getBlockForKey(startKey);
     const blockText = block.getText();
-    const charBeforeCursor = blockText.charAt(startOffset - 1);
-
+    const selection = editorState.getSelection();
+    const currentContent = editorState.getCurrentContent();
+    const currentBlock = currentContent.getBlockForKey(selection.getStartKey());
+    const blockType = currentBlock.getType();
+    console.log(
+      blockType,
+      "blockType",
+      blockText,
+      "blockText",
+      startOffset,
+      "startOffset"
+    );
     if (chars === " ") {
-      if (charBeforeCursor === "#") {
+      if (
+        blockType === "unstyled" &&
+        blockText.startsWith("#") &&
+        startOffset === 1
+      ) {
+        console.log("inside first block");
+        const contentState = Modifier.replaceText(
+          currentContent,
+          selection.merge({
+            anchorOffset: 0,
+            focusOffset: 1,
+          }),
+          ""
+        );
+        const newEditorState = EditorState.push(
+          editorState,
+          contentState,
+          "remove-range"
+        );
+        setEditorState(RichUtils.toggleBlockType(newEditorState, "header-one"));
+        return "handled";
+      } else if (
+        blockType === "unstyled" &&
+        blockText.startsWith("*") &&
+        startOffset === 1
+      ) {
+        console.log("inside second block");
+
         const newEditorState = EditorState.push(
           editorState,
           Modifier.replaceText(
@@ -86,85 +104,109 @@ const MyEditor = () => {
             ""
           )
         );
-        setEditorState(RichUtils.toggleBlockType(newEditorState, "header-one"));
-
+        setEditorState(RichUtils.toggleInlineStyle(newEditorState, "BOLD"));
         return "handled";
-      } else if (charBeforeCursor === "*") {
-        // const newEditorState = EditorState.push(
-        //   editorState,
-        //   Modifier.replaceText(
-        //     contentState,
-        //     selectionState.merge({
-        //       anchorOffset: startOffset - 1,
-        //       focusOffset: startOffset,
-        //     }),
-        //     ""
-        //   )
-        // );
-        setEditorState(RichUtils.toggleInlineStyle(editorState, "BOLD"));
+      } else if (
+        blockType === "unstyled" &&
+        blockText.startsWith("**") &&
+        startOffset === 2
+      ) {
+        console.log("inside third block");
+
+        const newEditorState = EditorState.push(
+          editorState,
+          Modifier.replaceText(
+            contentState,
+            selectionState.merge({
+              anchorOffset: startOffset - 2,
+              focusOffset: startOffset,
+            }),
+            ""
+          )
+        );
+        setEditorState(RichUtils.toggleInlineStyle(newEditorState, "redLine"));
+        return "handled";
+      } else if (
+        blockType === "unstyled" &&
+        blockText.startsWith("***") &&
+        startOffset === 3
+      ) {
+        console.log("inside third block");
+
+        const newEditorState = EditorState.push(
+          editorState,
+          Modifier.replaceText(
+            contentState,
+            selectionState.merge({
+              anchorOffset: startOffset - 3,
+              focusOffset: startOffset,
+            }),
+            ""
+          )
+        );
+        setEditorState(
+          RichUtils.toggleInlineStyle(newEditorState, "underline")
+        );
+        return "handled";
+      } else if (
+        blockType === "unstyled" &&
+        blockText.startsWith("```") &&
+        startOffset === 3
+      ) {
+        console.log("inside fourth block");
+
+        const newEditorState = EditorState.push(
+          editorState,
+          Modifier.replaceText(
+            contentState,
+            selectionState.merge({
+              anchorOffset: startOffset - 3,
+              focusOffset: startOffset,
+            }),
+            ""
+          )
+        );
+        setEditorState(
+          RichUtils.toggleInlineStyle(newEditorState, "codeBlock")
+        );
         return "handled";
       }
-    } else if (
-      charBeforeCursor === "*" &&
-      blockText.charAt(startOffset - 2) === "*"
-    ) {
-      const newEditorState = RichUtils.toggleInlineStyle(
-        editorState,
-        "redLine"
-      );
-      setEditorState(newEditorState);
-      return "handled";
-    } else if (
-      charBeforeCursor === "*" &&
-      blockText.charAt(startOffset - 2) === "*" &&
-      blockText.charAt(startOffset - 3) === "*"
-    ) {
-      const newEditorState = EditorState.push(
-        editorState,
-        Modifier.applyInlineStyle(contentState, selectionState, "underline")
-      );
-      setEditorState(newEditorState);
-      return "handled";
-    } else if (blockText.slice(startOffset - 3, startOffset + 1) === "``` ") {
-      const newEditorState = EditorState.push(
-        editorState,
-        Modifier.applyInlineStyle(contentState, selectionState, "codeBlock")
-      );
-      setEditorState(newEditorState);
-      return "handled";
     }
-
     return "not-handled";
   };
-  // const keyBindingFn = (e) => {
-  //   if (e.key === "Enter") {
-  //     const contentState = editorState.getCurrentContent();
-  //     const selectionState = editorState.getSelection();
-  //     const startKey = selectionState.getStartKey();
-  //     const block = contentState.getBlockForKey(startKey);
-  //     const blockText = block.getText();
-  //     const currentBlockType = RichUtils.getCurrentBlockType(editorState);
-  //     const currentStyle = editorState.getCurrentInlineStyle();
-  //     if (currentBlockType === "header-one") {
-  //       console.log(currentBlockType, "currentBlockType");
-  //       setEditorState(RichUtils.toggleBlockType(editorState, "unstyled"));
-  //       return getDefaultKeyBinding(e), "handled";
-  //     }
-  //     // if (blockText.trim().startsWith("#")) {
-  //     //   setEditorState(RichUtils.toggleBlockType(editorState, "header-one"));
-  //     // }
-  //   }
-
-  //   // return getDefaultKeyBinding(e);
-  // };
 
   const handleReturn = (event) => {
     const currentBlockType = RichUtils.getCurrentBlockType(editorState);
     const currentStyle = editorState.getCurrentInlineStyle();
     const isBold = currentStyle.has("BOLD");
-
+    const isRedLine = currentStyle.has("redLine");
+    const isUnderline = currentStyle.has("underline");
+    const isCodeBlock = currentStyle.has("codeBlock");
+    console.log(currentBlockType, "currentBlockType");
     if (currentBlockType === "header-one") {
-      const newEditorState = RichUtils.toggleBlockType(editorState, "unstyled");
+      // Create a new content state with unstyled block
+      const contentStateWithNewLine = Modifier.splitBlock(
+        editorState.getCurrentContent(),
+        editorState.getSelection()
+      );
+
+      // Push the new content state to update the editor state
+      let newEditorState = EditorState.push(
+        editorState,
+        contentStateWithNewLine,
+        "split-block"
+      );
+
+      // Toggle block type to unstyled for the new line
+      newEditorState = RichUtils.toggleBlockType(newEditorState, "unstyled");
+
+      // Set the new editor state
+      setEditorState(newEditorState);
+
+      // Handled the return
+      return "handled";
+    } else if (isBold) {
+      const newEditorState = RichUtils.toggleInlineStyle(editorState, "BOLD");
       const contentStateWithNewLine = Modifier.insertText(
         newEditorState.getCurrentContent(),
         newEditorState.getSelection(),
@@ -176,39 +218,60 @@ const MyEditor = () => {
         "insert-characters"
       );
       setEditorState(newEditorStateWithNewLine);
-
-      // const contentStateWithNewLine = Modifier.insertText(
-      //   editorState.getCurrentContent(),
-      //   editorState.getSelection(),
-      //   "\n"
-      // );
-      // const newEditorStateWithNewLine = EditorState.push(
-      //   editorState,
-      //   contentStateWithNewLine,
-      //   "insert-characters"
-      // );
-
+      return "handled";
+    } else if (isRedLine) {
+      const newEditorState = RichUtils.toggleInlineStyle(
+        editorState,
+        "redLine"
+      );
+      const contentStateWithNewLine = Modifier.insertText(
+        newEditorState.getCurrentContent(),
+        newEditorState.getSelection(),
+        "\n"
+      );
+      const newEditorStateWithNewLine = EditorState.push(
+        newEditorState,
+        contentStateWithNewLine,
+        "insert-characters"
+      );
       setEditorState(newEditorStateWithNewLine);
-      // setEditorState(newEditorState);
-      return "handled"; // Return 'handled' to prevent default behavior
+      return "handled";
+    } else if (isUnderline) {
+      const newEditorState = RichUtils.toggleInlineStyle(
+        editorState,
+        "underline"
+      );
+      const contentStateWithNewLine = Modifier.insertText(
+        newEditorState.getCurrentContent(),
+        newEditorState.getSelection(),
+        "\n"
+      );
+      const newEditorStateWithNewLine = EditorState.push(
+        newEditorState,
+        contentStateWithNewLine,
+        "insert-characters"
+      );
+      setEditorState(newEditorStateWithNewLine);
+      return "handled";
+    } else if (isCodeBlock) {
+      const newEditorState = RichUtils.toggleInlineStyle(
+        editorState,
+        "codeBlock"
+      );
+      const contentStateWithNewLine = Modifier.insertText(
+        newEditorState.getCurrentContent(),
+        newEditorState.getSelection(),
+        "\n"
+      );
+      const newEditorStateWithNewLine = EditorState.push(
+        newEditorState,
+        contentStateWithNewLine,
+        "insert-characters"
+      );
+      setEditorState(newEditorStateWithNewLine);
+      return "handled";
     } else {
-      if (isBold) {
-        const newEditorState = RichUtils.toggleInlineStyle(editorState, "BOLD");
-        const contentStateWithNewLine = Modifier.insertText(
-          newEditorState.getCurrentContent(),
-          newEditorState.getSelection(),
-          "\n"
-        );
-        const newEditorStateWithNewLine = EditorState.push(
-          newEditorState,
-          contentStateWithNewLine,
-          "insert-characters"
-        );
-        setEditorState(newEditorStateWithNewLine);
-        return "handled"; // Return 'handled' to prevent default behavior
-      } else {
-        return "not-handled"; // Return 'handled' to prevent default behavior
-      }
+      return "not-handled";
     }
   };
 
@@ -238,9 +301,7 @@ const MyEditor = () => {
         <Editor
           editorState={editorState}
           onChange={setEditorState}
-          //   handleKeyCommand={handleKeyCommand}
           handleBeforeInput={handleBeforeInput}
-          // keyBindingFn={keyBindingFn}
           customStyleMap={customStyleMap}
           handleReturn={handleReturn}
         />

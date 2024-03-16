@@ -43,8 +43,6 @@ const EditorComponent = () => {
     const selection = editorState.getSelection();
     const currentContent = editorState.getCurrentContent();
     const currentBlock = currentContent.getBlockForKey(selection.getStartKey());
-    const blockType = currentBlock.getType();
-
     const text = currentBlock.getText();
 
     // If the first character is '#' and at the beginning of the line
